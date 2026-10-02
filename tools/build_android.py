@@ -72,7 +72,8 @@ def main() -> None:
     output = Path(args.output).expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run([str(godot), "--headless", "--path", str(ROOT), "--editor", "--import", "--quit"], env=env, check=True)
-    subprocess.run([str(godot), "--headless", "--path", str(ROOT), "--script", "res://tests/run_tests.gd"], env=env, check=True)
+    for test_script in ("res://tests/run_tests.gd", "res://tests/skill_buffer_test.gd"):
+        subprocess.run([str(godot), "--headless", "--path", str(ROOT), "--script", test_script], env=env, check=True)
     subprocess.run([str(godot), "--headless", "--path", str(ROOT), "--export-debug", "Android", str(output)], env=env, check=True)
     if not output.exists():
         raise SystemExit("Godot did not produce an APK.")
