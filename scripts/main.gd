@@ -43,6 +43,9 @@ var skill_banner_time := 0.0
 var sound_bank: Dictionary = {}
 var pending_skill := ""
 var pending_skill_time := 0.0
+var blade_trail: Array[Dictionary] = []
+var blade_trail_key := ""
+var blade_trail_face := 1.0
 
 func _ready() -> void:
 	ui_font.base_font = FONT_BASE
@@ -54,7 +57,8 @@ func _ready() -> void:
 	model.message.connect(_show_message)
 	model.finished.connect(_on_finished)
 	model.skill_cast.connect(_on_skill_cast)
-	for kind in ["hit", "heavy", "dash", "burst", "ultimate"]:
+	model.skill_released.connect(_on_skill_released)
+	for kind in ["hit", "heavy", "slash", "dash", "burst", "ultimate", "charge", "finisher"]:
 		sound_bank[kind] = Sounds.make_sound(kind)
 	for index in range(6):
 		var audio := AudioStreamPlayer.new()
@@ -68,13 +72,6 @@ func _process(delta: float) -> void:
 	sound_clock = maxf(0.0, sound_clock - delta)
 	toast_time = maxf(0.0, toast_time - delta)
 	skill_banner_time = maxf(0.0, skill_banner_time - delta)
-	flash = maxf(0.0, flash - delta * 5.0)
-	shake = move_toward(shake, 0.0, delta * 22.0)
-	for particle in particles:
-		particle.pos += particle.velocity * delta
-		particle.velocity.y += 280.0 * delta
-		particle.life -= delta
-	particles = particles.filter(func(particle): return particle.life > 0.0)
 	if mode == "play":
 		if not pending_skill.is_empty():
 			pending_skill_time = maxf(0.0, pending_skill_time - delta)
@@ -89,14 +86,44 @@ func _process(delta: float) -> void:
 		else:
 			var combat_delta := minf(delta, 0.05)
 			combat_time += combat_delta
+			_advance_feedback(combat_delta)
 			var held_attack := Input.is_physical_key_pressed(KEY_J) or touch_actions.values().has("attack")
 			model.step(combat_delta, motion.limit_length(), held_attack and pending_skill.is_empty())
+			_sample_blade_trail()
 			if mode == "play" and not pending_skill.is_empty() and model.player.action_lock <= 0.0:
 				var requested_skill := pending_skill
 				pending_skill = ""
 				pending_skill_time = 0.0
 				_use_skill(requested_skill)
 	queue_redraw()
+
+func _advance_feedback(delta: float) -> void:
+	flash = maxf(0.0, flash - delta * 1.5)
+	shake = move_toward(shake, 0.0, delta * 30.0)
+	for particle in particles:
+		particle.pos += particle.velocity * delta
+		particle.velocity.y += 180.0 * delta
+		particle.life -= delta
+	particles = particles.filter(func(particle): return particle.life > 0.0)
+
+func _sample_blade_trail() -> void:
+	var fighter: Fighter = model.player
+	var anchors := Hero.blade_anchors(fighter, combat_time)
+	var key := "%s:%d" % [fighter.pose, anchors.frame]
+	var attacking := fighter.pose.begins_with("slash_") or fighter.pose in ["burst", "ultimate", "dash"]
+	if key != blade_trail_key or fighter.facing != blade_trail_face:
+		blade_trail.clear()
+	if not blade_trail.is_empty() and blade_trail[-1].root.distance_to(anchors.root) > 90.0:
+		blade_trail.clear()
+	blade_trail_key = key
+	blade_trail_face = fighter.facing
+	blade_trail = blade_trail.filter(func(sample): return combat_time - sample.time < 0.10)
+	if attacking and fighter.hp > 0.0:
+		blade_trail.append({"root": anchors.root, "tip": anchors.tip, "time": combat_time})
+		if blade_trail.size() > 8:
+			blade_trail.pop_front()
+	else:
+		blade_trail.clear()
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
@@ -189,6 +216,8 @@ func _pause() -> void:
 func _start() -> void:
 	_clear_input()
 	particles.clear()
+	blade_trail.clear()
+	blade_trail_key = ""
 	combat_time = 0.0
 	flash = 0.0
 	shake = 0.0
@@ -229,10 +258,12 @@ func _use_skill(name: String) -> void:
 func _on_skill_cast(name: String) -> void:
 	skill_banner = {"dash": "瞬斩 · 折光穿袭", "burst": "裂隙 · 三重连斩", "ultimate": "终式 · 断界"}.get(name, name)
 	skill_banner_time = 1.5 if name == "ultimate" else 0.9
-	_play_sound(name)
-	if name == "ultimate":
-		flash = 0.14
-		flash_color = GOLD
+	if name in ["burst", "ultimate"]:
+		_play_sound("charge")
+
+func _on_skill_released(name: String, stage: int) -> void:
+	var final_strike := (name == "burst" and stage == 3) or (name == "ultimate" and stage == 4)
+	_play_sound("finisher" if final_strike else name)
 
 func _show_message(text: String) -> void:
 	toast = text
@@ -248,13 +279,16 @@ func _on_finished(victory: bool, coins: int) -> void:
 		_show_message("存档失败，进度暂存在内存中")
 
 func _on_impact(pos: Vector2, color: Color, strength: float) -> void:
-	shake = maxf(shake, minf(12.0, strength * 11.0))
+	shake = maxf(shake, minf(7.0, strength * 6.0))
 	if strength >= 0.7:
-		flash = maxf(flash, 0.16 if strength < 1.0 else 0.28)
+		flash = maxf(flash, 0.045 if strength < 1.0 else 0.085)
 		flash_color = color
-	for index in range(int(strength * 23) + 4):
-		if particles.size() < 400:
-			particles.append({"pos": pos, "velocity": Vector2.from_angle(randf() * TAU) * randf_range(110, 430), "life": randf_range(0.14, 0.38), "color": color})
+	for index in range(int(strength * 9) + 3):
+		if particles.size() < 160:
+			var direction := (pos - model.player.pos + Vector2(0, 60)).normalized()
+			if direction.length_squared() < 0.1:
+				direction = Vector2(model.player.facing, -0.2)
+			particles.append({"pos": pos, "velocity": direction.rotated(randf_range(-1.1, 1.1)) * randf_range(95, 300), "life": randf_range(0.12, 0.28), "color": color})
 	if sound_clock <= 0.0 and not store.muted:
 		_play_sound("heavy" if strength >= 0.7 else "hit")
 		sound_clock = 0.045
@@ -295,7 +329,7 @@ func _draw() -> void:
 		_text(toast, Vector2(640, 150), 21, WHITE, true)
 
 func _draw_world() -> void:
-	world_offset = Vector2(sin(time * 97.0), cos(time * 83.0)) * shake
+	world_offset = Vector2(sin(combat_time * 97.0), cos(combat_time * 83.0)) * shake
 	draw_set_transform(world_offset)
 	var gradient := 36
 	for index in range(gradient):
@@ -348,12 +382,16 @@ func _draw_world() -> void:
 		draw_line(drop.pos - Vector2(0, 23), drop.pos - Vector2(0, 9), CYAN, 4)
 	var fighters: Array[Fighter] = []
 	for effect in model.effects:
+		VFX.draw_ground(self, effect, world_offset)
+	VFX.draw_blade_trail(self, blade_trail, combat_time, world_offset)
+	for effect in model.effects:
 		if effect.kind == "dash":
 			var trail_start: Vector2 = effect.pos
 			var trail_end: Vector2 = model.player.pos if model.player.pose == "dash" else effect.end
 			for index in range(1, 5):
 				Hero.draw_ghost(self, trail_start.lerp(trail_end, float(index) / 5.0), effect.face, combat_time,
-					float(effect.life) / float(effect.max) * 0.12, {"base_offset": world_offset, "height": effect.get("height", 0.0)})
+					pow(float(effect.life) / float(effect.max), 1.5) * (0.035 + index * 0.026),
+					{"base_offset": world_offset, "height": effect.get("height", 0.0), "color": Color("83d2ec"), "tilt": 0.0})
 	fighters.append_array(model.enemies)
 	fighters.append(model.player)
 	fighters.sort_custom(func(a, b): return a.pos.y < b.pos.y)
@@ -378,6 +416,10 @@ func _draw_fighter(fighter: Fighter) -> void:
 		return
 	if fighter.kind == "player":
 		Hero.draw_hero(self, fighter, combat_time, {"base_offset": world_offset})
+		var glow := _blade_glow(fighter)
+		if glow > 0.0:
+			var color := VFX.GOLD if fighter.pose == "ultimate" else (VFX.VIOLET if fighter.pose == "burst" else VFX.CYAN)
+			VFX.draw_blade_aura(self, Hero.blade_anchors(fighter, combat_time), glow, color, world_offset)
 		return
 	var scale_factor := 1.55 if fighter.kind == "boss" else 1.0
 	var pos := fighter.pos - Vector2(0, fighter.height)
@@ -415,6 +457,20 @@ func _draw_fighter(fighter: Fighter) -> void:
 		draw_rect(Rect2(origin, Vector2(56, 4)), Color("302e45"))
 		draw_rect(Rect2(origin, Vector2(56 * fighter.hp / fighter.max_hp, 4)), color)
 
+func _blade_glow(fighter: Fighter) -> float:
+	if fighter.pose == "dash":
+		return 0.7
+	if not Hero.RELEASE_TIMES.has(fighter.pose):
+		return 0.0
+	var releases: Array = Hero.RELEASE_TIMES[fighter.pose]
+	if fighter.pose_time < releases[0]:
+		return clampf(fighter.pose_time / releases[0], 0.0, 1.0) * 0.75
+	var last_release: float = releases[0]
+	for release in releases:
+		if fighter.pose_time >= release:
+			last_release = release
+	return exp(-(fighter.pose_time - last_release) * 16.0) * 0.8
+
 func _draw_effect(effect: Dictionary) -> void:
 	if effect.kind == "number":
 		var ratio := clampf(float(effect.life) / float(effect.max), 0.0, 1.0)
@@ -422,7 +478,7 @@ func _draw_effect(effect: Dictionary) -> void:
 		color.a = ratio
 		var heavy: bool = effect.get("heavy", false)
 		var progress := 1.0 - ratio
-		var size := int((31.0 if heavy else 23.0) * (1.0 + 0.24 * sin(progress * PI)))
+		var size := int((27.0 if heavy else 20.0) * (1.0 + 0.14 * sin(progress * PI)))
 		var pos: Vector2 = effect.pos - Vector2(0, progress * 56)
 		for outline in [Vector2(-1.5, 0), Vector2(1.5, 0), Vector2(0, -1.5), Vector2(0, 1.5)]:
 			_text(effect.text, pos + outline, size, Color(0.02, 0.04, 0.06, ratio), true)

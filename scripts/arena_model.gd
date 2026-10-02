@@ -5,6 +5,8 @@ signal impact(position: Vector2, color: Color, strength: float)
 signal message(text: String)
 signal finished(won: bool, reward: int)
 signal skill_cast(name: String)
+## Presentation events follow the same timeline as damage, including a whiff.
+signal skill_released(name: String, stage: int)
 
 const BOUNDS := Rect2(65, 334, 1150, 145)
 const MAX_WAVES := 3
@@ -188,6 +190,8 @@ func skill(name: String) -> bool:
 		_queue_hit("ultimate", 0.90, 3, 32.0 + power * 2.0, 470.0, 135.0, 60.0, 0.0, Color("94eeff"))
 		_queue_hit("ultimate", 1.28, 4, 125.0 + power * 8.0, 485.0, 140.0, 780.0, 650.0, Color("ffda91"))
 	skill_cast.emit(name)
+	if name == "dash":
+		skill_released.emit(name, 1)
 	return true
 
 func _can_act() -> bool:
@@ -212,11 +216,13 @@ func _update_pending_hits(delta: float) -> void:
 		_resolve_hit(hit)
 
 func _resolve_hit(hit: Dictionary) -> void:
-	var duration := 0.25 if hit.kind == "slash" else (0.56 if hit.stage >= 3 else 0.30)
+	var duration := (0.27 if hit.stage == 3 else 0.20) if hit.kind == "slash" else (0.36 if hit.stage >= 3 else 0.24)
 	if hit.kind == "ultimate":
-		duration = 0.76 if hit.stage == 4 else 0.30
+		duration = 0.48 if hit.stage == 4 else 0.24
 	_add_effect(hit.kind, hit.pos, duration, hit.color, {"face": hit.face, "height": hit.height, "stage": hit.stage, "size": hit.reach, "lane": hit.lane})
+	skill_released.emit("burst" if hit.kind == "rift" else hit.kind, hit.stage)
 	var heavy: bool = (hit.kind == "slash" and hit.stage == 3) or (hit.kind == "rift" and hit.stage == 3) or (hit.kind == "ultimate" and hit.stage == 4)
+	var confirmed_hit := false
 	for enemy in enemies:
 		if enemy.hp <= 0.0:
 			continue
@@ -227,11 +233,12 @@ func _resolve_hit(hit: Dictionary) -> void:
 		else:
 			inside = pow(difference.x / hit.reach, 2) + pow(difference.y / hit.lane, 2) <= 1.0 and enemy.height < 310.0
 		if inside:
+			confirmed_hit = true
 			var direction: float = hit.face if hit.shape == "forward" else (1.0 if difference.x >= 0.0 else -1.0)
 			_hit_enemy(enemy, hit.damage, hit.knockback, hit.launch, direction, hit.color, 0.9 if heavy else 0.42, 0.075 if heavy else 0.028)
 	if hit.kind == "rift" or hit.kind == "ultimate":
 		projectiles = projectiles.filter(func(projectile): return pow((projectile.pos.x - hit.pos.x) / hit.reach, 2) + pow((projectile.pos.y - hit.pos.y) / hit.lane, 2) > 1.0)
-	if heavy:
+	if heavy and confirmed_hit:
 		impact.emit(hit.pos - Vector2(0, 45), hit.color, 1.1 if hit.kind == "ultimate" else 0.7)
 
 func _update_dash(delta: float) -> void:
@@ -246,7 +253,7 @@ func _update_dash(delta: float) -> void:
 			dash_targets.append(enemy)
 			_hit_enemy(enemy, 46.0 + power * 6.0, 450.0, 130.0, active_dash.face, Color("8decff"), 0.65, 0.04)
 	if progress >= 1.0:
-		_add_effect("slash", player.pos, 0.25, Color("a6f5ff"), {"stage": 2, "size": 130.0})
+		_add_effect("slash", player.pos, 0.20, Color("a6f5ff"), {"stage": 2, "size": 130.0})
 		active_dash.clear()
 
 func _hit_enemy(enemy: Fighter, damage: float, knockback: float, launch: float = 0.0, direction: float = 0.0, color: Color = Color("fff0c8"), strength: float = 0.45, stop: float = 0.03) -> void:
@@ -268,7 +275,7 @@ func _hit_enemy(enemy: Fighter, damage: float, knockback: float, launch: float =
 	streak_window = 2.0
 	score += int(dealt) * 2
 	_add_effect("number", enemy.pos - Vector2(0, 105 + enemy.height), 0.65, color, {"text": str(int(dealt)), "heavy": strength > 0.7})
-	_add_effect("hit", enemy.pos - Vector2(0, 55 + enemy.height), 0.25, color, {"size": 68.0 if strength > 0.7 else 38.0, "strength": strength})
+	_add_effect("hit", enemy.pos - Vector2(0, 55 + enemy.height), 0.20, color, {"size": 68.0 if strength > 0.7 else 38.0, "strength": strength, "face": direction, "direction": Vector2(direction, -0.16).normalized()})
 	hitstop = maxf(hitstop, stop)
 	impact.emit(enemy.pos - Vector2(0, 55 + enemy.height), color, strength)
 	if enemy.hp <= 0.0:

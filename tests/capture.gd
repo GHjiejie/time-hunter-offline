@@ -3,13 +3,16 @@ extends SceneTree
 var scene: Node2D
 var capture_path := ""
 var checks := 0
+var failures := 0
 
 func _initialize() -> void:
 	call_deferred("capture")
 
 func verify(condition: bool, label: String) -> void:
 	checks += 1
-	assert(condition, label)
+	if not condition:
+		failures += 1
+		printerr("FAIL: " + label)
 
 func capture() -> void:
 	scene = load("res://scenes/main.tscn").instantiate()
@@ -70,7 +73,7 @@ func capture() -> void:
 	verify(scene.model.player.pose == "ultimate" and scene.model.energy == 25.0, "Touch ultimate spends energy")
 	await advance(12)
 	await shot("renfeng-ultimate-charge.png")
-	await advance(77)
+	await advance_until_effect("ultimate", 4, 110)
 	verify(scene.model.effects.any(func(effect): return effect.kind == "ultimate" and effect.stage == 4), "Ultimate final strike rendered")
 	verify(scene.model.enemies[3].hp < 1800, "Ultimate hits boss")
 	await shot("combat.png")
@@ -81,12 +84,12 @@ func capture() -> void:
 	event.pressed = true
 	scene._unhandled_input(event)
 	verify(scene.model.cooldowns.ultimate > 0, "Keyboard ultimate activation")
-	verify(scene.sound_bank.size() == 5, "Cached combat sounds available")
-	print("VISUAL / INPUT CHECKS: %d / FAILED: 0" % checks)
+	verify(scene.sound_bank.size() == 8, "Cached charge, release and combat sounds available")
+	print("VISUAL / INPUT CHECKS: %d / FAILED: %d" % [checks, failures])
 	print("CAPTURE: " + capture_path)
 	scene.queue_free()
 	await process_frame
-	quit()
+	quit(0 if failures == 0 else 1)
 
 func prepare_arena(pos: Vector2) -> void:
 	scene._start()
@@ -108,8 +111,16 @@ func prepare_arena(pos: Vector2) -> void:
 
 func advance(frames: int) -> void:
 	for index in range(frames):
+		# Desktop focus notifications are unrelated to synthetic touch input.
+		scene.mode = "play"
 		scene._process(1.0 / 60.0)
 		await process_frame
+
+func advance_until_effect(kind: String, stage: int, limit: int) -> void:
+	for index in range(limit):
+		if scene.model.effects.any(func(effect): return effect.kind == kind and effect.get("stage", -1) == stage):
+			return
+		await advance(1)
 
 func shot(filename: String) -> void:
 	scene.queue_redraw()

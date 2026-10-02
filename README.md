@@ -1,6 +1,6 @@
 # 裂隙猎人 · Time Hunter Offline
 
-以《时空猎人》的横版刷图体验为玩法参考，制作可离线运行的 **Android 原创单机格斗游戏**。当前是 **v0.2.0「刃锋 · 断界」可玩原型**：一名角色、一张地图和三波战斗，包含最终 Boss。刃锋已替换为原创原画与透明动作图集，配合能量刀光、程序绘制场景及合成音效；无需服务器。目前只开发 Android，暂不生成 iOS 代码或打包配置。
+以《时空猎人》的横版刷图体验为玩法参考，制作可离线运行的 **Android 原创单机格斗游戏**。当前是 **v0.2.0「刃锋 · 断界」可玩原型**：一名角色、一张地图和三波战斗，包含最终 Boss。刃锋采用原创原画与透明动作图集，技能已按动作、表现、判定分层重新设计，配合银青折光刀光、程序绘制场景及合成音效；无需服务器。目前只开发 Android，暂不生成 iOS 代码或打包配置。
 
 ![战斗画面](docs/combat.png)
 
@@ -9,6 +9,7 @@
 - 刃锋：米白非对称外套、墨蓝银色挑染、单侧机械护臂与折光刃；主界面立绘、HUD 肖像和八姿势战斗图集。
 - 三段普攻在刀刃接触时结算，第三击挑空；冲刺残影、刀光、火花、浮动伤害、敌人受击闪白与速度击退。
 - 命中停顿冻结战斗与角色动作，配合镜头震动和缓存的刀刃 / 重击 / 蓄力音效。
+- 重做技能刀光：银青普攻、收束瞬斩残影、紫青三段裂隙和金白断界；手部挂点、世界坐标剑带及释放音效与命中时点同步。暂停与命中停顿同时冻结特效，挥空不触发命中震动。
 - 按住攻击时点技能，会在当前普攻结束后优先释放，再恢复连招；缓存随暂停和受伤打断清除。
 - 横屏触屏摇杆与多点触控，可以同时移动、攻击和施放技能。
 - 跳跃躲避攻击，生命值、能量恢复、技能冷却与连击计分。
@@ -40,7 +41,9 @@ godot --path .
 godot --headless --path . --editor --import --quit
 godot --headless --path . --script res://tests/run_tests.gd
 godot --headless --path . --script res://tests/skill_buffer_test.gd
+godot --headless --path . --script res://tests/skill_vfx_test.gd
 CAPTURE_DIR=/tmp/rift-hunter-capture godot --path . --script res://tests/capture.gd
+CAPTURE_DIR=/tmp/rift-hunter-vfx godot --path . --script res://tests/skill_vfx_capture.gd
 ```
 
 键盘调试：WASD / 方向键移动，J 攻击，K 瞬斩，L 裂隙连斩，U 断界，空格跳跃，Esc 暂停，Enter 出击。手机使用屏幕摇杆和技能按钮；长按攻击可连续普攻。
@@ -74,3 +77,5 @@ export_presets.cfg     Android 导出预设
 当前角色使用八姿势 2D 动作图集与程序插值，左右移动采用镜像，尚未制作完整骨骼动画；敌人和场景仍以程序几何绘制为主。后续可扩展动画帧、职业、装备、地图与剧情，并根据 Android 真机反馈调整性能和手感。
 
 字体和引擎许可见 [第三方说明](docs/third-party.md)。
+
+技能重设计及验证说明见 [设计记录](docs/skill-vfx-design.md)，[实际运行预览](docs/skill-vfx-showcase.gif) 包含左右朝向的普攻、瞬斩、裂隙与断界。
