@@ -16,11 +16,22 @@ func check(condition: bool, label: String) -> void:
 		printerr("FAIL: " + label)
 
 func run() -> void:
+	cleanup_progress()
 	scene = load("res://scenes/main.tscn").instantiate()
 	scene.store.storage_path = TEST_PROGRESS
 	scene.store.muted = true
 	root.add_child(scene)
 	scene.set_process(false)
+	check(is_instance_valid(scene.campaign_ui), "Campaign UI and main scene initialize without dependency errors")
+	if not is_instance_valid(scene.campaign_ui):
+		cleanup_progress()
+		scene.queue_free()
+		quit(1)
+		return
+	check(scene.store.new_game(), "Buffer test creates an isolated campaign save")
+	scene.store.legacy_skills = true
+	scene.store.variants.burst = "wide"
+	scene.store.muted = true
 	scene.model.skill_cast.connect(func(name): casts.append(name))
 	prepare()
 	scene._pointer(1, scene.ATTACK_CENTER, true)
@@ -81,21 +92,24 @@ func run() -> void:
 	prepare()
 	scene._pointer(8, scene.ATTACK_CENTER, true)
 	scene._use_skill("burst")
-	scene._start()
+	check(scene.store.abandon_run(), "Restart abandons the previous saved run")
+	scene._start("outskirts")
 	check(scene.pending_skill.is_empty(), "new round clears queue")
 	prepare()
 	scene._pointer(9, scene.ATTACK_CENTER, true)
 	scene._use_skill("burst")
 	scene._on_finished(false, 0)
 	check(scene.pending_skill.is_empty(), "result clears queue")
-	DirAccess.remove_absolute(TEST_PROGRESS)
+	cleanup_progress()
 	scene.queue_free()
 	print("SKILL BUFFER CHECKS: %d / FAILED: %d" % [checks, failures])
 	quit(0 if failures == 0 else 1)
 
 func prepare() -> void:
-	scene._start()
-	scene.model.wave = 3
+	check(scene.store.abandon_run(), "Previous buffer test run is safely abandoned")
+	scene._start("outskirts")
+	check(scene.mode == "play" and scene.model.has_skill("ultimate"), "Buffer arena starts with all legacy skills")
+	scene.model.wave = scene.model.total_waves
 	var target := Fighter.new()
 	target.pos = scene.model.player.pos + Vector2(80, 0)
 	target.hp = 2000.0
@@ -107,3 +121,7 @@ func prepare() -> void:
 func advance(frames: int) -> void:
 	for index in range(frames):
 		scene._process(0.01)
+
+func cleanup_progress() -> void:
+	for suffix in ["", ".bak", ".tmp", ".bak.tmp"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PROGRESS + suffix))

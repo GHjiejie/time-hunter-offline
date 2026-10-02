@@ -1,81 +1,62 @@
 # 裂隙猎人 · Time Hunter Offline
 
-以《时空猎人》的横版刷图体验为玩法参考，制作可离线运行的 **Android 原创单机格斗游戏**。当前是 **v0.2.0「刃锋 · 断界」可玩原型**：一名角色、一张地图和三波战斗，包含最终 Boss。刃锋采用原创原画与透明动作图集，技能已按动作、表现、判定分层重新设计，配合银青折光刀光、程序绘制场景及合成音效；无需服务器。目前只开发 Android，暂不生成 iOS 代码或打包配置。
+Godot 4.5.2 制作的 Android 原创离线横版格斗游戏。当前为 **v0.3.0「遗落港远征」**：保留刃锋与已重设计的技能特效，完成一章三关的准备、战斗、结算、装备、成长与再次挑战流程。无需服务器。
 
-![战斗画面](docs/combat.png)
+![出战准备](docs/campaign-prepare.png)
 
-## 当前内容
+## 当前玩法
 
-- 刃锋：米白非对称外套、墨蓝银色挑染、单侧机械护臂与折光刃；主界面立绘、HUD 肖像和八姿势战斗图集。
-- 三段普攻在刀刃接触时结算，第三击挑空；冲刺残影、刀光、火花、浮动伤害、敌人受击闪白与速度击退。
-- 命中停顿冻结战斗与角色动作，配合镜头震动和缓存的刀刃 / 重击 / 蓄力音效。
-- 重做技能刀光：银青普攻、收束瞬斩残影、紫青三段裂隙和金白断界；手部挂点、世界坐标剑带及释放音效与命中时点同步。暂停与命中停顿同时冻结特效，挥空不触发命中震动。
-- 按住攻击时点技能，会在当前普攻结束后优先释放，再恢复连招；缓存随暂停和受伤打断清除。
-- 横屏触屏摇杆与多点触控，可以同时移动、攻击和施放技能。
-- 跳跃躲避攻击，生命值、能量恢复、技能冷却与连击计分。
-- 近战机械兵、远程机械兵与带落点预警的裂隙守卫 Boss。
-- 生命拾取、胜负结算、晶币强化、最高分与本机存档。
-- 暂停、返回基地、静音；应用切到后台后自动暂停。
-- Android APK 导出配置、签名验证脚本、GitHub Actions 构建流程。
+- 三关独立结算：遗迹外围教授距离与躲避；机械回廊组合重装、射手、冲锋与周期危险；核心大厅以短热身进入两阶段 Boss。
+- 四类普通敌人有明确前摇与恢复窗口。重装可绕后或用普攻第三段破防；冲锋锁定路线；射手先瞄准；Boss 使用横扫、冲锋与标记地面，半血后改变顺序并增加双落点。
+- 武器、防具、饰品三个槽位，6 件初始选择与3件首通装备。背包提供部位/新获得筛选、属性对比、穿脱、锁定、确认处置和关键装备保护。
+- 连击输出与反击生存两种被动；裂隙广域/聚焦、断界标准/精准在范围与伤害间取舍。装备改变生命、攻击、冷却与能量恢复。
+- 通关获得经验和金币；首通必得装备并解锁下一关，首通外围解锁断界。等级上限 Lv.11，槽位强化上限 +3，成本与结果固定。
+- 每关有一个可攻击开启的补给箱，额外8金币只在胜利时入账。
+- 胜利、失败、退出与重试均有明确出口；训练场免费试用全技能，不发放奖励。
+- 全菜单支持键盘焦点导航和鼠标/触屏；战斗保留横屏摇杆、多点触控、按住攻击与技能输入缓冲。
+- 设置支持音量、静音、震动、闪光、火花数量、伤害数字、大字、桌面全屏与按键重映射。
 
-| 技能 | 表现与判定 | 能量 / 冷却 |
-| --- | --- | --- |
-| 瞬斩 · 折光穿袭 | 快速突进 285 像素，沿途每名敌人命中一次，带残影与刀光 | 22 / 3.5 秒 |
-| 裂隙 · 三重连斩 | 蓄力后连续三段范围斩，挑空后重击击退，并清除范围内弹幕 | 48 / 7 秒 |
-| 终式 · 断界 | 角色特写、蓄力、三次空间切割与第四段重击终结，施放期间无敌 | 75 / 15 秒 |
+| 关卡 | 常规通关：金币 / 经验 | 额外首通：金币 / 经验 | 必得装备与解锁 |
+| --- | --- | --- | --- |
+| 遗迹外围 | 45 / 45 | 60 / 60 | 双锋刃、断界、机械回廊 |
+| 机械回廊 | 70 / 75 | 85 / 75 | 逆击甲、核心大厅 |
+| 核心大厅 | 110 / 105 | 120 / 100 | 时序晶核、第一章完成 |
 
-## 安装与平台状态
+![机械回廊](docs/campaign-corridor.png)
 
-Android 调试 APK 已在 macOS 构建并通过签名和 Manifest 检查。支持 Android 7.0（API 24）及以上、ARM64 / ARMv7；实际性能仍需在手机上测试。APK 没有 INTERNET、存储、相机或麦克风权限。首次安装时，在手机系统中允许对应文件管理器安装应用，再打开 APK。
+## 存档与中断
 
-GitHub 构建成功后，可在 Actions 的 `Android APK` 运行记录中下载 `rift-hunter-android-debug` Artifact，解压获得 APK。调试签名用于个人测试；正式发布需配置自己的稳定签名密钥。CI 每次生成新的调试密钥，跨次构建的 APK 可能不能直接覆盖安装；本机脚本保留 `.tools/debug.keystore` 以便后续覆盖更新。
+进度保存在本机 `user://progress.json`。更换装备、配置、强化和设置立即保存；出战记录先保存，再开始战斗。安全断点在遭遇开始前保存。后台、失焦与暂停冻结战斗并清除旧输入；重开游戏继续时，从最近安全遭遇恢复满生命、满能量和零冷却，该遭遇与未入账补给重新开始。
 
-详见 [Android 打包说明](docs/mobile-build.md)。
+只有通关结算成功后才显示奖励已到账。金币、经验、装备、首通、关卡解锁和出战完成作为一次事务保存，同次出战无法重复领奖。失败与退出不扣已有成长，只放弃本次未结算收益；失败页可按同一随机种子从检查点重新挑战。
 
-## 开发运行
+存档采用版本校验、临时文件回读、替换与有效备份。保存失败回滚内存变化，结算页可重试。旧版进度保留金币、等级和原有技能。主文件损坏时恢复有效备份；无法识别的文件保留，新游戏前说明覆盖范围并确认。
 
-使用 **Godot 4.5.2 Standard**（GDScript，不需要 .NET）打开 `project.godot`，按 F6 / F5 运行。导出模板需与引擎版本一致。
+## 运行与安装
+
+使用 Godot 4.5.2 Standard 打开 `project.godot`，按 F5 运行。默认 WASD / 方向键移动、J 攻击、K 瞬斩、L 裂隙、U 断界、空格跳跃、Esc 暂停。菜单用 Tab / 方向键切换、Enter 确认、Esc 返回。可在设置修改战斗按键。
 
 ```sh
 godot --path .
 godot --headless --path . --editor --import --quit
 godot --headless --path . --script res://tests/run_tests.gd
+godot --headless --path . --script res://tests/progression_test.gd
+godot --headless --path . --script res://tests/campaign_combat_test.gd
+godot --headless --path . --script res://tests/campaign_ui_test.gd
+godot --headless --path . --script res://tests/campaign_flow_test.gd
 godot --headless --path . --script res://tests/skill_buffer_test.gd
 godot --headless --path . --script res://tests/skill_vfx_test.gd
-CAPTURE_DIR=/tmp/rift-hunter-capture godot --path . --script res://tests/capture.gd
-CAPTURE_DIR=/tmp/rift-hunter-vfx godot --path . --script res://tests/skill_vfx_capture.gd
+CAPTURE_DIR=/tmp/rift-hunter-campaign godot --path . --script res://tests/campaign_capture.gd
 ```
 
-键盘调试：WASD / 方向键移动，J 攻击，K 瞬斩，L 裂隙连斩，U 断界，空格跳跃，Esc 暂停，Enter 出击。手机使用屏幕摇杆和技能按钮；长按攻击可连续普攻。
+Android 支持 API 24 及以上、ARM64 / ARMv7，APK 无网络、存储、相机或麦克风权限。本机调试构建复用 `.tools/debug.keystore`，可覆盖更新此前同签名版本。GitHub Actions 的 `Android APK` 工作流提供构建 Artifact；CI 临时签名可能无法覆盖本机版本。正式发布需要稳定的发布密钥。
 
-## 项目结构
+打包步骤见 [Android 说明](docs/mobile-build.md)，本轮变更与验证见 [P0 实现记录](docs/gameplay-p0.md)。
 
-```text
-project.godot         Godot 工程入口
-scenes/main.tscn     主场景
-scripts/arena_model.gd  战斗状态、判定、敌人 AI、波次
-scripts/fighter.gd      角色状态
-scripts/main.gd         画面、HUD、触屏输入、音效
-scripts/hero_renderer.gd 原创动作图集、脚底定位、镜像与残影
-scripts/combat_vfx.gd   多层刀光、能量环、命中与终结特效
-scripts/combat_audio.gd 缓存的合成战斗音效
-scripts/save_store.gd   存档与强化
-assets/characters/     原创刃锋原画、动作图集与实际生成提示词
-assets/effects/        透明能量刀光
-tests/run_tests.gd      74 项战斗 / 存档检查
-tests/skill_buffer_test.gd 18 项技能缓存场景检查
-tests/capture.gd        图形运行与多点触控检查、截图
-tests/hero_visual_test.gd 八姿势双向渲染检查
-tools/build_android.py 测试、APK 导出与签名验证
-export_presets.cfg     Android 导出预设
-```
+## 项目与验证
 
-## 验证边界与后续开发
+`game_content.gd` 定义关卡与物品；`arena_model.gd` 负责判定；`save_store.gd` 负责进度与事务；`campaign_ui.gd` 负责原生菜单；`input_bindings.gd` 负责按键；`main.gd` 接通流程、绘制、触控与音效。角色和特效由 `hero_renderer.gd`、`combat_vfx.gd`、`combat_audio.gd` 表现。
 
-已完成 Godot 4.5.2 导入与运行、74 项战斗 / 存档检查、18 项技能缓存场景检查、25 项图形 / 输入 / 截图检查，以及八姿势双向渲染检查。v0.2.0 Android APK 已构建，v2/v3 签名、版本、架构、无权限声明与新增资源检查通过，沿用本机 v0.1.0 包的签名以支持覆盖更新。桌面触控事件检查不能替代手机真机测试，GitHub Actions 也需以实际运行结果为准。
+模型、存档、场景流程、界面与技能回归共522项检查通过，另有37项图形与输入检查。截图来自实际 Godot Compatibility 渲染，包括1280×720与960×540大字布局；受控清敌用于验证流程，不代表真人通关或难度测评。Android 真机性能、触屏手感和长时间稳定性仍需设备测试。角色使用八姿势图集与插值，场景和敌人主要由程序几何绘制。
 
-当前角色使用八姿势 2D 动作图集与程序插值，左右移动采用镜像，尚未制作完整骨骼动画；敌人和场景仍以程序几何绘制为主。后续可扩展动画帧、职业、装备、地图与剧情，并根据 Android 真机反馈调整性能和手感。
-
-字体和引擎许可见 [第三方说明](docs/third-party.md)。
-
-技能重设计及验证说明见 [设计记录](docs/skill-vfx-design.md)，[实际运行预览](docs/skill-vfx-showcase.gif) 包含左右朝向的普攻、瞬斩、裂隙与断界。
+此前技能改造见 [设计记录](docs/skill-vfx-design.md) 与 [运行预览](docs/skill-vfx-showcase.gif)。字体和引擎许可见 [第三方说明](docs/third-party.md)。

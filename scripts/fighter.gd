@@ -23,6 +23,21 @@ var pose_time := 0.0
 var pose_duration := 0.0
 var moving := 0.0
 var action_lock := 0.0
+# Enemy combat state is shared with the warning renderer. Targets and rush
+# endpoints are captured at windup start; they never chase during a warning.
+var attack_kind := ""
+var attack_phase := "idle"
+var recovery := 0.0
+var phase := 1
+var attack_index := 0
+var rush_direction := Vector2.ZERO
+var rush_start := Vector2.ZERO
+var rush_end := Vector2.ZERO
+var rush_left := 0.0
+var rush_duration := 0.32
+var rush_hit := false
+var guard_open := 0.0
+var stagger_cooldown := 0.0
 
 func set_pose(name: String, duration: float) -> void:
 	pose = name

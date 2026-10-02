@@ -12,6 +12,15 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def run_godot(command: list[str], env: dict[str, str]) -> None:
+    # Godot can exit zero after a GDScript dependency failed to compile.
+    result = subprocess.run(command, env=env, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True)
+    print(result.stdout, end="", flush=True)
+    if result.returncode or re.search(r"(?m)^(SCRIPT ERROR:|ERROR:|FAIL:)", result.stdout):
+        raise SystemExit("Godot validation failed; APK build stopped.")
+
+
 def editor_data_dir(executable: Path) -> Path:
     for ancestor in executable.parents:
         if ancestor.suffix == ".app":
@@ -71,10 +80,12 @@ def main() -> None:
     env.update(GODOT_ANDROID_KEYSTORE_DEBUG_PATH=str(keystore), GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey", GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android")
     output = Path(args.output).expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run([str(godot), "--headless", "--path", str(ROOT), "--editor", "--import", "--quit"], env=env, check=True)
-    for test_script in ("res://tests/run_tests.gd", "res://tests/skill_buffer_test.gd"):
-        subprocess.run([str(godot), "--headless", "--path", str(ROOT), "--script", test_script], env=env, check=True)
-    subprocess.run([str(godot), "--headless", "--path", str(ROOT), "--export-debug", "Android", str(output)], env=env, check=True)
+    run_godot([str(godot), "--headless", "--path", str(ROOT), "--editor", "--import", "--quit"], env)
+    for name in ("run_tests", "skill_buffer_test", "skill_vfx_test", "progression_test",
+                 "campaign_combat_test", "campaign_ui_test", "campaign_flow_test"):
+        run_godot([str(godot), "--headless", "--path", str(ROOT), "--script",
+                   f"res://tests/{name}.gd"], env)
+    run_godot([str(godot), "--headless", "--path", str(ROOT), "--export-debug", "Android", str(output)], env)
     if not output.exists():
         raise SystemExit("Godot did not produce an APK.")
     signer = sdk / ("build-tools/35.0.1/apksigner.bat" if sys.platform == "win32" else "build-tools/35.0.1/apksigner")

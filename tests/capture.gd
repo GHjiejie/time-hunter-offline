@@ -4,6 +4,7 @@ var scene: Node2D
 var capture_path := ""
 var checks := 0
 var failures := 0
+const TEST_PROGRESS := "user://combat-capture-test-progress.json"
 
 func _initialize() -> void:
 	call_deferred("capture")
@@ -15,8 +16,16 @@ func verify(condition: bool, label: String) -> void:
 		printerr("FAIL: " + label)
 
 func capture() -> void:
+	cleanup_progress()
 	scene = load("res://scenes/main.tscn").instantiate()
+	scene.store.storage_path = TEST_PROGRESS
 	root.add_child(scene)
+	verify(is_instance_valid(scene.campaign_ui), "Campaign UI initializes for graphical capture")
+	if not is_instance_valid(scene.campaign_ui):
+		cleanup_progress()
+		scene.queue_free()
+		quit(1)
+		return
 	root.size = Vector2i(1280, 720)
 	await create_timer(0.5).timeout
 	scene.set_process(false)
@@ -24,9 +33,13 @@ func capture() -> void:
 	if capture_path.is_empty(): capture_path = "user://"
 	DirAccess.make_dir_recursive_absolute(capture_path)
 	await shot("menu.png")
-	scene._pointer(1, Vector2(1000, 330), true)
-	verify(scene.mode == "play", "Start button begins game")
-	scene._pointer(1, Vector2(1000, 330), false)
+	scene._ui_action("begin", {})
+	verify(scene.mode == "prepare" and scene.store.has_progress, "Begin creates an isolated new game and opens preparation")
+	scene.store.legacy_skills = true
+	scene.store.variants.burst = "wide"
+	scene.store.muted = true
+	scene._start("outskirts")
+	verify(scene.mode == "play" and not scene.store.active_run.is_empty(), "Preparation starts a saved outskirts run")
 	scene._pointer(15, Vector2(207, 587), true)
 	scene._pointer(16, scene.ATTACK_CENTER, true)
 	verify(scene.stick.x > 0 and scene.touch_actions.values().has("attack"), "Move and attack together")
@@ -87,15 +100,18 @@ func capture() -> void:
 	verify(scene.sound_bank.size() == 8, "Cached charge, release and combat sounds available")
 	print("VISUAL / INPUT CHECKS: %d / FAILED: %d" % [checks, failures])
 	print("CAPTURE: " + capture_path)
+	cleanup_progress()
 	scene.queue_free()
 	await process_frame
 	quit(0 if failures == 0 else 1)
 
 func prepare_arena(pos: Vector2) -> void:
-	scene._start()
+	verify(scene.store.abandon_run(), "Previous capture run is safely abandoned")
+	scene._start("outskirts")
+	verify(scene.mode == "play", "Capture arena starts through campaign preparation")
 	scene.toast_time = 0.0
 	scene.model.player.pos = pos
-	scene.model.wave = 3
+	scene.model.wave = scene.model.total_waves
 	scene.model.wave_wait = 2.0
 	for index in range(4):
 		var enemy := Fighter.new()
@@ -113,6 +129,7 @@ func advance(frames: int) -> void:
 	for index in range(frames):
 		# Desktop focus notifications are unrelated to synthetic touch input.
 		scene.mode = "play"
+		scene.campaign_ui.hide_ui()
 		scene._process(1.0 / 60.0)
 		await process_frame
 
@@ -128,3 +145,7 @@ func shot(filename: String) -> void:
 	await RenderingServer.frame_post_draw
 	var error := root.get_texture().get_image().save_png(capture_path.path_join(filename))
 	verify(error == OK, "Screenshot saved: " + filename)
+
+func cleanup_progress() -> void:
+	for suffix in ["", ".bak", ".tmp", ".bak.tmp"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PROGRESS + suffix))

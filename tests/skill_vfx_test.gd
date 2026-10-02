@@ -151,14 +151,24 @@ func test_effect_expiry_and_reset() -> void:
 
 
 func test_presentation_freezes() -> void:
+	cleanup_progress()
 	scene = load("res://scenes/main.tscn").instantiate()
 	scene.store.storage_path = TEST_PROGRESS
 	scene.store.muted = true
 	root.add_child(scene)
 	scene.set_process(false)
-	scene._start()
+	check(is_instance_valid(scene.campaign_ui), "Campaign UI and VFX scene initialize without dependency errors")
+	if not is_instance_valid(scene.campaign_ui):
+		cleanup_progress()
+		scene.queue_free()
+		return
+	check(scene.store.new_game(), "VFX scene test creates an isolated campaign save")
+	scene.store.legacy_skills = true
+	scene.store.variants.burst = "wide"
 	scene.store.muted = true
-	scene.model.wave = Model.MAX_WAVES
+	scene._start("outskirts")
+	check(scene.mode == "play" and scene.model.has_skill("ultimate"), "VFX scene starts with all legacy skills")
+	scene.model.wave = scene.model.total_waves
 	target_at(scene.model, scene.model.player.pos + Vector2(500, 0))
 	scene.model.skill("ultimate")
 	scene.particles.append({"pos": Vector2(620, 330), "velocity": Vector2(80, -50), "life": 0.4, "color": Color.WHITE})
@@ -184,7 +194,13 @@ func test_presentation_freezes() -> void:
 	scene._process(1.0 / 60.0)
 	check(scene.model.player.pose_time > pose_time and scene.model.effects[0].life < effects[0].life, "resume continues cast from frozen phase")
 	check(scene.particles[0].life < particles[0].life, "resume advances particle lifetime")
-	scene._start()
+	check(scene.store.abandon_run(), "VFX restart safely abandons previous run")
+	scene._start("outskirts")
 	check(scene.particles.is_empty() and scene.flash == 0.0 and scene.shake == 0.0 and scene.combat_time == 0.0, "scene restart clears all presentation remnants")
-	DirAccess.remove_absolute(TEST_PROGRESS)
+	cleanup_progress()
 	scene.queue_free()
+
+
+func cleanup_progress() -> void:
+	for suffix in ["", ".bak", ".tmp", ".bak.tmp"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PROGRESS + suffix))

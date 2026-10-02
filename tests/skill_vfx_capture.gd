@@ -21,6 +21,7 @@ func _initialize() -> void:
 
 
 func capture() -> void:
+	cleanup_progress()
 	capture_dir = OS.get_environment("CAPTURE_DIR")
 	if capture_dir.is_empty():
 		capture_dir = "user://skill-vfx-showcase"
@@ -33,6 +34,15 @@ func capture() -> void:
 	root.size = Vector2i(1280, 720)
 	root.add_child(scene)
 	scene.set_process(false)
+	if not is_instance_valid(scene.campaign_ui):
+		printerr("Campaign UI failed to initialize; skill capture cancelled")
+		cleanup_progress()
+		scene.queue_free()
+		quit(1)
+		return
+	assert(scene.store.new_game(), "Showcase must create an isolated campaign save")
+	scene.store.legacy_skills = true
+	scene.store.variants.burst = "wide"
 	scene.store.muted = true
 	for direction in [1.0, -1.0]:
 		facing = direction
@@ -57,7 +67,7 @@ func capture() -> void:
 		assert(scene.model.skill("ultimate"))
 		await record_frames(120)
 	write_manifest()
-	DirAccess.remove_absolute(TEST_PROGRESS)
+	cleanup_progress()
 	print("SKILL VFX CAPTURE: %d frames at 60 fps; %s" % [frames.size(), capture_dir])
 	print("NAMED SHOTS: " + str(named_shots.keys()))
 	scene.queue_free()
@@ -69,13 +79,15 @@ func prepare(name: String) -> void:
 	clip = name
 	clip_frame = 0
 	scene.store.level = 0
-	scene._start()
+	assert(scene.store.abandon_run(), "Previous showcase run must be safely abandoned")
+	scene._start("outskirts")
+	assert(scene.mode == "play" and scene.model.has_skill("ultimate"), "Showcase starts with all legacy skills")
 	scene.model.rng.seed = CAPTURE_SEED
 	scene.model.player.pos = Vector2(640, 422)
 	if name == "dash":
 		scene.model.player.pos.x = 500.0 if facing > 0.0 else 780.0
 	scene.model.player.facing = facing
-	scene.model.wave = scene.model.MAX_WAVES
+	scene.model.wave = scene.model.total_waves
 	scene.model.wave_wait = 100.0
 	scene.store.level = 0
 	scene.store.muted = true
@@ -102,6 +114,7 @@ func record_frames(count: int) -> void:
 func record_frame() -> void:
 	# The real scene's simulation, hitstop, poses, effects and feedback are used.
 	scene.mode = "play"
+	scene.campaign_ui.hide_ui()
 	scene._process(FRAME_DELTA)
 	var effects_before_draw: Array[Dictionary] = scene.model.effects.duplicate(true)
 	var target_health: Array[float] = []
@@ -168,3 +181,8 @@ func write_manifest() -> void:
 		"frames": frames,
 	}, "\t"))
 	file.close()
+
+
+func cleanup_progress() -> void:
+	for suffix in ["", ".bak", ".tmp", ".bak.tmp"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEST_PROGRESS + suffix))
