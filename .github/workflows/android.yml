@@ -1,0 +1,38 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.5.2 and matching Android templates
+        shell: bash
+        run: |
+          mkdir -p .tools/godot/editor_data/export_templates/4.5.2.stable
+          curl -fL --retry 3 https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v4.5.2-stable_linux.x86_64.zip -o .tools/godot.zip
+          unzip -q .tools/godot.zip -d .tools/godot
+          touch .tools/godot/_sc_
+          curl -fL --retry 3 https://github.com/godotengine/godot/releases/download/4.5.2-stable/Godot_v4.5.2-stable_export_templates.tpz -o .tools/templates.tpz
+          unzip -j -q .tools/templates.tpz templates/android_debug.apk templates/android_release.apk templates/version.txt -d .tools/godot/editor_data/export_templates/4.5.2.stable
+      - name: Install required Android SDK packages
+        shell: bash
+        run: |
+          "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-35" "build-tools;35.0.1"
+      - name: Test, build and verify signed debug APK
+        shell: bash
+        run: |
+          python3 tools/build_android.py --godot .tools/godot/Godot_v4.5.2-stable_linux.x86_64 --java-home "${JAVA_HOME_17_X64}" --sdk "${ANDROID_HOME}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rift-hunter-android-debug
+          path: build/android/rift-hunter-debug.apk
+          if-no-files-found: error

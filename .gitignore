@@ -1,0 +1,16 @@
+.godot/
+.DS_Store
+.tools/
+build/
+*.apk
+*.aab
+*.ipa
+*.pck
+*.keystore
+*.jks
+*.mobileprovision
+*.p12
+export_credentials.cfg
+.env
+__pycache__/
+*.pyc
